@@ -4,4 +4,3 @@ hard_tabs = false
 tab_spaces = 4
 newline_style = "Unix"
 use_small_heuristics = "Max"
-group_imports = "StdExternalCrate"
