@@ -11,6 +11,7 @@ env:
   RUSTFLAGS: "-D warnings"
 
 jobs:
+  # ── Formato y linting ────────────────────────────
   quality:
     name: Code Quality
     runs-on: ubuntu-latest
@@ -38,8 +39,43 @@ jobs:
       - name: Clippy (lints + best practices)
         run: cargo clippy --all-targets --all-features -- -D warnings
 
+  # ── Tests + Coverage ────────────────────────────
   test:
-    name: Tests
+    name: Tests & Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Run tests with coverage
+        run: cargo llvm-cov --workspace --lcov --output-path lcov.info
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: lcov.info
+          fail_ci_if_error: false
+
+  # ── Release build ───────────────────────────────
+  build:
+    name: Build (release)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -54,12 +90,13 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
+          key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-release-
 
-      - name: Run tests
-        run: cargo test --workspace --verbose
+      - name: Build release binary
+        run: cargo build --release
 
+  # ── Seguridad ───────────────────────────────────
   security:
     name: Security Audit
     runs-on: ubuntu-latest
@@ -74,3 +111,21 @@ jobs:
 
       - name: Audit dependencies for vulnerabilities
         run: cargo audit
+
+      - name: Check for unused dependencies
+        run: cargo install cargo-udeps --locked && cargo udeps
+
+  # ── Documentación ───────────────────────────────
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Check docs compile
+        run: cargo doc --no-deps --document-private-items
+        env:
+          RUSTDOCFLAGS: "-D warnings"
