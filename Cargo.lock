@@ -170,6 +170,10 @@ dependencies = [
 [[package]]
 name = "cortex-gateway"
 version = "0.1.0"
+dependencies = [
+ "cortex-core",
+ "toml",
+]
 
 [[package]]
 name = "crossbeam-epoch"
