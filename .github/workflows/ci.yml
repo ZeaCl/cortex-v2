@@ -36,7 +36,7 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all --check
 
-      - name: Clippy (lints + best practices)
+      - name: Clippy (all targets, all features)
         run: cargo clippy --all-targets --all-features -- -D warnings
 
   # ── Tests + Coverage ────────────────────────────
@@ -96,9 +96,15 @@ jobs:
       - name: Build release binary
         run: cargo build --release
 
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cortex-gateway
+          path: target/release/cortex-gateway
+
   # ── Seguridad ───────────────────────────────────
   security:
-    name: Security Audit
+    name: Security & Licenses
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -111,6 +117,12 @@ jobs:
 
       - name: Audit dependencies for vulnerabilities
         run: cargo audit
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked
+
+      - name: Check licenses and sources
+        run: cargo deny check
 
       - name: Check for unused dependencies
         run: cargo install cargo-udeps --locked && cargo udeps
@@ -125,7 +137,50 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Check docs compile
+      - name: Check docs compile without warnings
         run: cargo doc --no-deps --document-private-items
         env:
           RUSTDOCFLAGS: "-D warnings"
+
+  # ── Semver ──────────────────────────────────────
+  semver:
+    name: API Breaking Changes
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-semver-checks
+        run: cargo install cargo-semver-checks --locked
+
+      - name: Check for breaking changes
+        run: cargo semver-checks
+
+  # ── Benchmarks ──────────────────────────────────
+  bench:
+    name: Benchmarks
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Run benchmarks
+        run: cargo bench --no-run
