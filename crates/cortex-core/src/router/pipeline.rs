@@ -1,8 +1,6 @@
 use crate::types::{ServiceRequest, ServiceResponse};
 use crate::worker::error::WorkerError;
 use async_trait::async_trait;
-use std::future::Future;
-use std::pin::Pin;
 
 /// Resultado de un paso del pipeline.
 pub enum StepResult {
@@ -26,29 +24,14 @@ impl Pipeline {
         Self { steps }
     }
 
-    /// Ejecuta la cadena recursivamente.
-    /// step[0] decide → si Next, llama a step[1], y así.
+    /// Ejecuta la cadena en orden. Cada paso decide: ¿respondo o paso al siguiente?
     pub async fn run(&self, request: ServiceRequest) -> Result<ServiceResponse, WorkerError> {
-        self.run_from(0, request).await
-    }
-
-    fn run_from(
-        &self,
-        index: usize,
-        request: ServiceRequest,
-    ) -> Pin<Box<dyn Future<Output = Result<ServiceResponse, WorkerError>> + Send + '_>> {
-        if index >= self.steps.len() {
-            return Box::pin(async { Err(WorkerError::ConfigError("pipeline exhausted".into())) });
-        }
-
-        let step = &self.steps[index];
-        let next_index = index + 1;
-
-        Box::pin(async move {
+        for step in &self.steps {
             match step.handle(&request).await? {
-                StepResult::Done(response) => Ok(response),
-                StepResult::Next => self.run_from(next_index, request).await,
+                StepResult::Done(response) => return Ok(response),
+                StepResult::Next => continue,
             }
-        })
+        }
+        Err(WorkerError::ConfigError("pipeline exhausted".into()))
     }
 }
