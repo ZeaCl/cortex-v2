@@ -1,44 +1,14 @@
-use crate::pipeline::{Pipeline, Step, StepResult};
+pub mod pipeline;
+pub mod steps;
+
 use crate::registry::WorkerRegistry;
 use crate::types::{ServiceRequest, ServiceResponse};
 use crate::worker::error::WorkerError;
-use async_trait::async_trait;
+use pipeline::{Pipeline, Step};
+use steps::failover::FailoverStep;
 
-/// Paso del pipeline: intenta ejecutar el request en cada worker del registro.
-/// Si uno falla, prueba el siguiente. Si todos fallan, devuelve error.
-pub struct FailoverStep {
-    registry: WorkerRegistry,
-    service_type: String,
-}
-
-impl FailoverStep {
-    pub fn new(registry: WorkerRegistry, service_type: String) -> Self {
-        Self { registry, service_type }
-    }
-}
-
-#[async_trait]
-impl Step for FailoverStep {
-    async fn handle(&self, request: &ServiceRequest) -> Result<StepResult, WorkerError> {
-        let names = self.registry.list_by_service_type(&self.service_type);
-        if names.is_empty() {
-            return Err(WorkerError::ConfigError("no workers available".into()));
-        }
-
-        for name in &names {
-            if let Some(worker) = self.registry.get(name) {
-                match worker.execute(request.clone()).await {
-                    Ok(response) => return Ok(StepResult::Done(response)),
-                    Err(_) => continue,
-                }
-            }
-        }
-
-        Err(WorkerError::ConfigError("all workers failed".into()))
-    }
-}
-
-/// El Router ahora es un Pipeline. Se pueden agregar pasos antes del failover.
+/// El Router: un Pipeline con pasos encadenados.
+/// Por defecto contiene solo FailoverStep. Se pueden agregar más con with_step().
 pub struct Router {
     pipeline: Pipeline,
 }
@@ -50,7 +20,7 @@ impl Router {
         Self { pipeline: Pipeline::new(steps) }
     }
 
-    /// Permite agregar pasos antes del failover (rate limit, circuit breaker, etc).
+    /// Agrega un paso antes del failover (rate limit, circuit breaker, etc).
     pub fn with_step(mut self, step: Box<dyn Step>) -> Self {
         self.pipeline.steps.insert(self.pipeline.steps.len() - 1, step);
         self
@@ -64,12 +34,13 @@ impl Router {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::router::pipeline::{Step, StepResult};
     use crate::types::UserContext;
     use crate::worker::Worker;
     use crate::worker::error::HealthStatus;
+    use async_trait::async_trait;
     use std::collections::HashMap;
 
-    /// Paso que siempre retorna Next (como un rate limiter que deja pasar todo).
     struct PassStep;
 
     #[async_trait]
@@ -79,7 +50,6 @@ mod tests {
         }
     }
 
-    /// Paso que corta la cadena con un error.
     struct BlockStep {
         status: u16,
     }
@@ -155,7 +125,6 @@ mod tests {
         let reg = WorkerRegistry::new();
         reg.register(Box::new(OkWorker { name: "deepseek".into() }));
         let router = Router::new(reg, "llm").with_step(Box::new(BlockStep { status: 429 }));
-
         let result = router.route(make_request()).await;
         assert!(result.is_err());
         match result.unwrap_err() {
@@ -169,7 +138,6 @@ mod tests {
         let reg = WorkerRegistry::new();
         reg.register(Box::new(OkWorker { name: "deepseek".into() }));
         let router = Router::new(reg, "llm").with_step(Box::new(PassStep));
-
         let result = router.route(make_request()).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap().worker, "deepseek");
