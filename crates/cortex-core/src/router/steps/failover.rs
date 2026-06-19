@@ -1,7 +1,7 @@
-use crate::registry::WorkerRegistry;
 use crate::router::pipeline::{Step, StepResult};
 use crate::types::ServiceRequest;
 use crate::worker::error::WorkerError;
+use crate::worker::registry::WorkerRegistry;
 use async_trait::async_trait;
 
 /// Paso del pipeline: intenta ejecutar el request en cada worker del registro.

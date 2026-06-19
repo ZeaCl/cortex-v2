@@ -1,9 +1,9 @@
 pub mod pipeline;
 pub mod steps;
 
-use crate::registry::WorkerRegistry;
 use crate::types::{ServiceRequest, ServiceResponse};
 use crate::worker::error::WorkerError;
+use crate::worker::registry::WorkerRegistry;
 use pipeline::{Pipeline, Step};
 use steps::failover::FailoverStep;
 
