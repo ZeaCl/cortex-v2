@@ -2,8 +2,6 @@
 
 [advisories]
 vulnerability = "deny"
-unmaintained = "none"
-unsound = "deny"
 yanked = "deny"
 
 [licenses]
