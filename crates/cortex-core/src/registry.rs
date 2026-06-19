@@ -5,6 +5,12 @@ pub struct WorkerRegistry {
     workers: DashMap<String, Box<dyn Worker>>,
 }
 
+impl Default for WorkerRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl WorkerRegistry {
     pub fn new() -> Self {
         Self { workers: DashMap::new() }

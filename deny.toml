@@ -1,11 +1,10 @@
-# cargo-deny config — https://embarkstudios.github.io/cargo-deny/
+# cargo-deny config
 
 [advisories]
 vulnerability = "deny"
 unmaintained = "warn"
 unsound = "deny"
 yanked = "deny"
-ignore = []
 
 [licenses]
 allow = [
@@ -17,14 +16,10 @@ allow = [
     "Unicode-3.0",
     "Zlib",
 ]
-confidence-threshold = 0.8
 
 [bans]
 multiple-versions = "warn"
-deny = []
-skip = []
 
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
-allow-git = []
