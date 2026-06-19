@@ -2,7 +2,7 @@
 name = "cortex-gateway"
 version = "0.1.0"
 edition = "2024"
-license = "MIT"
+license = { workspace = true }
 
 [dependencies]
 cortex-core = { path = "../cortex-core" }
